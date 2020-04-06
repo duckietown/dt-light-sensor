@@ -1,3 +1,8 @@
 default_mult: 1
 default_offset: 0
-frequency: 1
+
+#parameter for the light sensor
+#integration time: values in MS: 700,154,101,50,24
+integration_time: 50
+#integration gain:: 1,4,16,60
+integration_gain: 4

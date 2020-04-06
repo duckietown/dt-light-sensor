@@ -4,7 +4,7 @@
 
 	<group ns="$(arg veh)">
 		<node name="light_calib_node" pkg="light_sensor_calibration" type="light_calib_node.py" output="screen" required="true">
-			
+			<rosparam command="load" file="$(find light_sensor)/config/light_sensor_node/default.yaml"/>
 		</node>
 		
 	</group>

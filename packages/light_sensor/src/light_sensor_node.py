@@ -22,53 +22,55 @@ class LightSensorNode(DTROS):
         # initialize the DTROS parent class
         super(LightSensorNode, self).__init__(node_name=node_name)
 
-        # Add the node parameters to the parameters dictionary and load their default values
-        self.parameters['~default_mult'] = None
-        self.parameters['~default_offset']=None
-        self.parameters['~frequency']=None
-        self.updateParameters()
-
         self.veh_name = rospy.get_namespace().strip("/")
         
         # GPIO setup
-        # Choose BCM or BOARD numbering schemes
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
         GPIO.setup(18, GPIO.OUT)
         GPIO.output(18, GPIO.LOW)
 
-        # Set integrationtime and gain
-        self.tcs = Adafruit_TCS34725.TCS34725(
-            integration_time=Adafruit_TCS34725.TCS34725_INTEGRATIONTIME_700MS,
-            gain=Adafruit_TCS34725.TCS34725_GAIN_1X)
+        # Add the node parameters to the parameters dictionary and load their default values
+        self.parameters['~default_mult'] = None
+        self.parameters['~default_offset']=None
+        self.parameters['~integration_time']=None
+        self.parameters['~integration_gain']=None
 
-        #define file path
-        self.filepath = '/data/config/calibrations/light-sensor/' + self.veh_name + ".yaml"
+        self.updateParameters()
 
         #define parameter
         self.mult = 0
         self.offset = 0
-        self.default_mult=self.parameters['~default_mult'] #default value = 1
-        self.default_offset= self.parameters['~default_offset'] #default value = 0
-        #set parametervalue
-        self.readParamFromFile()
+        self.default_mult=self.parameters['~default_mult']
+        self.default_offset= self.parameters['~default_offset']
+        self.integration_time = self.parameters['~integration_time']
+        self.integration_gain = self.parameters['~integration_gain']
         
-        #define time between evaluations in sec. 
-        self.timesensor = 1/self.parameters['~frequency'] #value = 1: every second one measurment
+        #convert integration time and gain if form that it has to be
+        self.convert_integration()
+        
+        #set integration time and value
+        self.tcs = Adafruit_TCS34725.TCS34725(
+            integration_time=self.integration_time,gain=self.integration_gain)
 
+        #define file path
+        self.filepath = '/data/config/calibrations/light-sensor/' + self.veh_name + ".yaml"
+
+        #set parametervalue from callibration
+        self.readParamFromFile()
 
         # ROS-Publications
         self.msg_light_sensor = LightSensor()
         self.sensor_pub = self.publisher('~sensor_data', LightSensor, queue_size=1)
         while not rospy.is_shutdown():
             self.get_lux()
-            rospy.sleep(rospy.Duration.from_sec(self.timesensor))
+            
         
     def get_lux(self):
         # Read R, G, B, C color data from the sensor.
         r, g, b, c = self.tcs.get_raw_data()
         # Calulate color temp
-        temp = Adafruit_TCS34725.calculate_color_temperature(r, g, b)
+        #temp = Adafruit_TCS34725.calculate_color_temperature(r, g, b)
         # Calculate lux and multiply it with gain
         lux = Adafruit_TCS34725.calculate_lux(r, g, b)
         real_lux = self.mult * lux + self.offset
@@ -84,8 +86,11 @@ class LightSensorNode(DTROS):
         self.msg_light_sensor.c = c
         self.msg_light_sensor.real_lux = real_lux
         self.msg_light_sensor.lux = lux
-        self.msg_light_sensor.temp = temp
+        #self.msg_light_sensor.temp = temp
         self.sensor_pub.publish(self.msg_light_sensor)
+        
+        #print message
+        rospy.loginfo(self.msg_light_sensor)
 
     
 
@@ -104,6 +109,30 @@ class LightSensorNode(DTROS):
                 
         rospy.loginfo("[%s] from callibration %s = %s " % (self.node_name,"mult", self.mult))
         rospy.loginfo("[%s] from callibration %s = %s " % (self.node_name,"offset", self.offset))
+    
+    def convert_integration(self):
+        #convert integration time in the form that it has to be
+        if self.integration_time==700:
+            self.integration_time = Adafruit_TCS34725.TCS34725_INTEGRATIONTIME_700MS
+        if self.integration_time==154:
+            self.integration_time = Adafruit_TCS34725.TCS34725_INTEGRATIONTIME_154MS
+        if self.integration_time==101:
+            self.integration_time = Adafruit_TCS34725.TCS34725_INTEGRATIONTIME_101MS
+        if self.integration_time==50:
+            self.integration_time = Adafruit_TCS34725.TCS34725_INTEGRATIONTIME_50MS
+        if self.integration_time==24:
+            self.integration_time = Adafruit_TCS34725.TCS34725_INTEGRATIONTIME_24MS
+            
+        #convert integration gain in the form that it has to be
+        if self.integration_gain==1:
+            self.integration_gain = Adafruit_TCS34725.TCS34725_GAIN_1X
+        if self.integration_gain==4:
+            self.integration_gain = Adafruit_TCS34725.TCS34725_GAIN_4X
+        if self.integration_gain==16:
+            self.integration_gain = Adafruit_TCS34725.TCS34725_GAIN_16X
+        if self.integration_gain==60:
+            self.integration_gain = Adafruit_TCS34725.TCS34725_GAIN_60X
+
 
 
 if __name__ == '__main__':
